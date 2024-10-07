@@ -1,0 +1,75 @@
+{
+    "name": "ọjà mi - A new shopping experience",
+    "description": "a new shopping experience powered by Kora",
+    "short_name": "ọjà mi",
+    "icons": [
+      {
+        "src": "/icons/oja-800.png",
+        "sizes": "800x800",
+        "type": "image/png"
+      },
+      {
+        "src": "/icons/oja-246.png",
+        "sizes": "256x256",
+        "type": "image/png"
+      },
+  
+      {
+        "src": "/icons/oja-512.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ],
+    "screenshots": [
+      {
+        "src": "/pwa/thumbnail.png",
+        "sizes": "1920x1080",
+        "type": "image/jpeg",
+        "purpose": "any",
+        "platform": "desktop",
+        "form_factor": "wide"
+      },
+      {
+        "src": "/pwa/oja-market-sm.png",
+        "sizes": "3416x2024",
+        "type": "image/jpeg",
+        "purpose": "any",
+        "platform": "desktop",
+        "form_factor": "wide"
+      },
+      {
+        "src": "/pwa/oja-banner.png",
+        "sizes": "1920x1080",
+        "type": "image/jpeg",
+        "purpose": "any",
+        "platform": "desktop",
+        "form_factor": "wide"
+      },
+      {
+        "src": "/pwa/splash-screen.png",
+        "sizes": "430x932",
+        "type": "image/jpeg",
+        "purpose": "any",
+        "platform": "mobile"
+      },
+      {
+        "src": "/pwa/oja-vendor.png",
+        "sizes": "860x1864",
+        "type": "image/jpeg",
+        "purpose": "any",
+        "platform": "mobile"
+      },
+      {
+        "src": "/pwa/oja-init.png",
+        "sizes": "430x932",
+        "type": "image/jpeg",
+        "purpose": "any",
+        "platform": "mobile"
+      }
+    ],
+    "theme_color": "#FFFFFF",
+    "background_color": "#FFFFFF",
+    "start_url": "https://www.ojami.shop",
+    "display": "standalone",
+    "orientation": "portrait"
+  }
