@@ -64,16 +64,17 @@ const ProductsPage = () => {
     }
   }, [products, productId]);
 
-  const averageRating =
-    products?.ratings.length! > 0
-      ? (
-          products?.ratings?.reduce(
-            (acc: any, curr) => parseInt(acc) + Number(curr),
-            0
-          )! / products?.ratings?.length!
-        ).toFixed(1)
-      : "0.0";
+  // const averageRating =
+  //   products?.ratings.length! > 0
+  //     ? (
+  //         products?.ratings?.reduce(
+  //           (acc: any, curr) => parseInt(acc) + Number(curr),
+  //           0
+  //         )! / products?.ratings?.length!
+  //       ).toFixed(1)
+  //     : "0.0";
 
+  const averageRating = 4.5;
   const { getInputProps, getIncrementButtonProps, getDecrementButtonProps } =
     useNumberInput({
       step: 1,

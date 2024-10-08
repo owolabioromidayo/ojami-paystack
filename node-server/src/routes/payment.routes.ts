@@ -22,7 +22,7 @@ import { isAuth } from "../middleware/isAuth";
 //     const fetch = await import('node-fetch');
 //     // Now you can use fetch as needed
 // })();
-import { VirtualAccount } from "../entities/VirtualAccount";
+// import { VirtualAccount } from "../entities/VirtualAccount";
 import { Transaction } from "../entities/Transaction";
 import {
   ACCOUNT_NAME,
@@ -44,19 +44,21 @@ import { Voucher } from "../entities/Voucher";
 import { VoucherStatus } from "../types";
 import { PayInTransaction } from "../entities/PayInTransaction";
 import { Order } from "../entities/Order";
+import { VirtualAccount } from "../entities/VirtualAccount";
 
 const router = express.Router();
 
 const URL_PREFIX = `${process.env.DOMAIN_URL}/p/`;
 
 const kora_token = process.env.KORAPAY_API_TOKEN
+const paystack_token = process.env.PAYSTACK_API_TOKEN
 
-router.post("/virtual_accounts/new", isAuth, createNewVirtualBankAccount);
+// router.post("/virtual_accounts/new", isAuth, createNewVirtualBankAccount);
 
-router.post("/pay_in/bank_transfer", isAuth, receiveBankTransferFromCustomer);
+// router.post("/pay_in/bank_transfer", isAuth, receiveBankTransferFromCustomer);
 
-router.post("/pay_in/checkout_standard", isAuth, initializeCheckout);
-router.post("/pay_in/success", isAuth, completeCheckout);
+// router.post("/pay_in/checkout_standard", isAuth, initializeCheckout);
+// router.post("/pay_in/success", isAuth, completeCheckout);
 
 
 router.post("/make_virtual_payment", isAuth, makeVirtualPayment);
@@ -80,8 +82,15 @@ router.post("/vouchers/generate", isAuth, generateVoucher);
 router.get("/vouchers/me", isAuth, fetchMyVouchers);
 router.post("/vouchers/redeem", isAuth, redeemVoucher);
 
+
+
+// router.post("/transaction/initialize", isAuth, initializeTransaction);
+router.get("/transaction/verify/:reference", verifyTransaction);
+
+
 //payout to bank account
-router.post("/payout", isAuth, payoutHandler);
+router.post("/payout/initialize", isAuth, initializePayout);
+router.post("/payout/finalize", isAuth, finalizePayout);
 
 async function createNewVirtualBankAccount(req: Request, res: Response) {
   const em = (req as RequestWithContext).em;
@@ -152,88 +161,6 @@ async function createNewVirtualBankAccount(req: Request, res: Response) {
   }
 }
 
-async function receiveBankTransferFromCustomer(req: Request, res: Response) {
-  const { currency } = req.body;
-
-  const amount = Number(req.body.amount);
-
-  if (isNaN(amount)) {
-    return res
-      .status(400)
-      .json({ errors: [{ field: "amount", message: "Invalid amount" }] });
-  }
-
-  const em = (req as RequestWithContext).em;
-
-  try {
-    //go through  with original transfer to dynamic virtual account
-
-    const user = await em
-      .fork({})
-      .findOneOrFail(User, { id: req.session.userid });
-
-    const payload = {
-      reference: uuidv4(),
-      amount,
-      currency,
-      notification_url: BANK_TRANSFER_NOTIFICATION_URL,
-      merchant_bears_cost: false,
-      customer: {
-        name: `${user.firstname} ${user.lastname}`,
-        email: user.email,
-      },
-    };
-
-    const resp = await fetch(
-      "https://api.korapay.com/merchant/api/v1/charges/bank-transfer",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${KORAPAY_TOKEN}`,
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    if (!resp.ok) {
-      return res
-        .status(500)
-        .json({ errors: [{ message: "Could not create virtual card" }] });
-    }
-
-    const data = (await resp.json()) as BankTransferResponse;
-    if (data.status === true) {
-      const transaction = new Transaction(data, user);
-      await em.fork({}).persistAndFlush(transaction);
-      return res.status(201).json({ transaction });
-    } else {
-      return res
-        .status(500)
-        .json({
-          errors: [
-            {
-              status: "Virtual account create request failed",
-              message: data.message,
-            },
-          ],
-        });
-    }
-  } catch (err) {
-    return res
-      .status(500)
-      .json({
-        errors: [
-          {
-            status: "Virtual account create request failed",
-            message: "None",
-            error: err,
-          },
-        ],
-      });
-  }
-}
-
 async function makeVirtualPayment(req: Request, res: Response) {
   const { receivingUserId, orderId, isInstantPurchase, amount } = req.body;
 
@@ -260,7 +187,7 @@ async function makeVirtualPayment(req: Request, res: Response) {
 
   if (!receivingUserId || isNaN(Number(receivingUserId))) {
     return res
-      .status(400)
+      .status(401)
       .json({
         errors: [
           {
@@ -273,7 +200,7 @@ async function makeVirtualPayment(req: Request, res: Response) {
 
   if (!orderId || isNaN(Number(orderId))) {
     return res
-      .status(400)
+      .status(401)
       .json({
         errors: [{ field: "orderId", message: "orderId is not a number" }],
       });
@@ -790,18 +717,13 @@ async function redeemVoucher(req: Request, res: Response) {
   }
 }
 
-async function payoutHandler(req: Request, res: Response) {
-  const { destination, metadata } = req.body as PayoutRequest;
+async function initializePayout(req: Request, res: Response) {
+  const { amount } = req.body;
 
-  // Validate required fields
-  if (
-    !destination ||
-    !destination.type ||
-    !destination.amount ||
-    !destination.currency ||
-    !destination.customer.email
-  ) {
-    return res.status(400).json({ errors: [{ message: "Missing required fields" }] });
+  if (!amount || isNaN(Number(amount))) {
+    return res
+      .status(400)
+      .json({ errors: [{ field: "amount", message: "Amount is not valid" }] });
   }
 
   const em = (req as RequestWithContext).em;
@@ -813,23 +735,24 @@ async function payoutHandler(req: Request, res: Response) {
       { populate: ["virtualWallet"] }
     );
 
-    if (user.virtualWallet.balance < destination.amount) {
+    if (user.virtualWallet.balance < amount) {
       return res.status(400).json({ errors: [{ message: "Insufficient balance" }] });
     }
 
     const payload: PayoutRequest = {
-      reference: uuidv4(),
-      destination,
-      metadata,
+      source: "balance",
+      currency: "NGN",
+      amount: amount,
+      recipient: "TODO",
     };
 
     const resp = await fetch(
-      "https://api.korapay.com/merchant/api/v1/transactions/disburse",
+      "https://api.paystack.co/transfer",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${kora_token}`,
+          Authorization: `Bearer ${paystack_token}`,
         },
         body: JSON.stringify(payload),
       }
@@ -843,11 +766,19 @@ async function payoutHandler(req: Request, res: Response) {
     const data = (await resp.json()) as PayoutResponse;
 
     if (data.status === true) {
-      user.virtualWallet.balance -= destination.amount;
-      await em.fork({}).persistAndFlush(user.virtualWallet);
+      const transaction = new Transaction(user, user.virtualWallet, {
+        status: "pending",
+        amount: amount,
+        created_at: data.data.createdAt, 
+        currency: "NGN",
+        reference: data.data.transfer_code,
+        
+      }, "payout");
+
+      await em.fork({}).persistAndFlush(transaction);
 
       return res.status(200).json({
-        message: data.data.status === "success" ? "Payout successful" : "Payout processing",
+        message: "Payout initiated",
         data: data.data,
       });
     } else {
@@ -858,6 +789,200 @@ async function payoutHandler(req: Request, res: Response) {
     return res.status(500).json({ errors: [{ message: "Failed to process payout", error: err.message }] });
   }
 }
+
+async function finalizePayout(req: Request, res: Response) {
+  const { transfer_code, otp } = req.body;
+
+  if (!transfer_code || !otp) {
+    return res.status(400).json({ 
+      errors: [{ message: "Transfer code and OTP are required" }] 
+    });
+  }
+
+  const em = (req as RequestWithContext).em;
+
+  try {
+    const payload = {
+      transfer_code,
+      otp
+    };
+
+    const resp = await fetch(
+      "https://api.paystack.co/transfer/finalize_transfer",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${paystack_token}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!resp.ok) {
+      const errorData = await resp.json().catch(() => ({}));
+      return res.status(500).json({ 
+        errors: [{ message: "Failed to finalize transfer", details: errorData }] 
+      });
+    }
+
+    const data = await resp.json();
+
+    if (data.status === true && data.data.status === "success") {
+      // const user = await em.fork({}).findOneOrFail(
+      //   User,
+      //   { id: req.session.userid },
+      //   { populate: ["virtualWallet"] }
+      // );
+
+      const transaction = await em.fork({}).findOneOrFail(
+        Transaction,
+        { reference: transfer_code }, {populate: ['user', 'virtualWallet']}
+
+      );
+      if (transaction.status === "pending"){
+        transaction.status = "success";
+        transaction.paidAt = new Date();
+
+        transaction.virtualWallet.balance -= data.data.amount / 100; // Convert from kobo to Naira
+        await em.fork({}).persistAndFlush([transaction.virtualWallet, transaction]);
+      }
+
+      return res.status(200).json({
+        message: "Transfer has been queued",
+        data: data.data,
+      });
+    } else {
+      const transaction = await em.fork({}).findOneOrFail(
+        Transaction,
+        { reference: data.data.reference }
+      );
+
+      transaction.status = "failed";
+      await em.fork({}).persistAndFlush(transaction);
+
+      return res.status(500).json({ errors: [{ message: data.message }] });
+    }
+  } catch (err: any) {
+    console.error("Error finalizing transfer:", err);
+    return res.status(500).json({ 
+      errors: [{ message: "Failed to finalize transfer", error: err.message }] 
+    });
+  }
+}
+
+// async function initializeTransaction(req: Request, res: Response) {
+//   const em = (req as RequestWithContext).em;
+//   const { amount, orderId } = req.body;
+
+//   if (!amount || isNaN(Number(amount))) {
+//     return res.status(400).json({ errors: [{ field: "amount", message: "Invalid amount" }] });
+//   }
+
+
+
+//   try {
+//     const user = await em.fork({}).findOneOrFail(User, { id: req.session.userid });
+//     const order = await em.fork({}).findOneOrFail(Order, { id: Number(orderId) });
+
+//     const payload = {
+//       amount: Math.round(Number(amount) * 100), // Convert to kobo
+//       email: user.email,
+//       reference: uuidv4(),
+//       callback_url: `${process.env.DOMAIN_URL}/payment/verify/${orderId}`,
+//     };
+
+//     const resp = await fetch(
+//       "https://api.paystack.co/transaction/initialize",
+//       {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//           Authorization: `Bearer ${paystack_token}`,
+//         },
+//         body: JSON.stringify(payload),
+//       }
+//     );
+
+//     if (!resp.ok) {
+//       const errorData = await resp.json().catch(() => ({}));
+//       return res.status(500).json({ 
+//         errors: [{ message: "Failed to initialize transaction", details: errorData }] 
+//       });
+//     }
+
+//     const data = await resp.json();
+
+//     if (data.status) {
+//       order.paymentReference = payload.reference;
+//       await em.fork({}).persistAndFlush(order);
+
+//       return res.status(200).json({
+//         message: "Transaction initialized",
+//         data: data.data,
+//       });
+//     } else {
+//       return res.status(500).json({ errors: [{ message: data.message }] });
+//     }
+//   } catch (err: any) {
+//     console.error("Error initializing transaction:", err);
+//     return res.status(500).json({ 
+//       errors: [{ message: "Failed to initialize transaction", error: err.message }] 
+//     });
+//   }
+// }
+
+async function verifyTransaction(req: Request, res: Response) {
+  const em = (req as RequestWithContext).em;
+  const { reference } = req.params;
+
+  try {
+    const resp = await fetch(
+      `https://api.paystack.co/transaction/verify/${reference}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${paystack_token}`,
+        },
+      }
+    );
+
+    if (!resp.ok) {
+      const errorData = await resp.json().catch(() => ({}));
+      return res.status(500).json({ 
+        errors: [{ message: "Failed to verify transaction", details: errorData }] 
+      });
+    }
+
+    const data = await resp.json();
+
+    if (data.status && data.message === "Verification successful") {
+      const transaction = await em.fork({}).findOneOrFail(Transaction, { reference }, { populate: ["user", "virtualWallet"] });
+      if (transaction.status === "pending") { 
+        transaction.status = "success";
+        transaction.virtualWallet.balance += transaction.amount;
+        await em.fork({}).persistAndFlush([transaction, transaction.virtualWallet] );
+      }
+      
+
+      return res.status(200).json({
+        message: "Transaction verified successfully",
+        data: data.data,
+      });
+    } else {
+      return res.status(400).json({ errors: [{ message: "Transaction verification failed" }] });
+    }
+  } catch (err: any) {
+    console.error("Error verifying transaction:", err);
+    return res.status(500).json({ 
+      errors: [{ message: "Failed to verify transaction", error: err.message }] 
+    });
+  }
+}
+
+
+
+
 
 async function completeCheckout(req: Request, res: Response) {
 

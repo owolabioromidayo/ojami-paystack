@@ -109,58 +109,79 @@ export interface GetQueryChargeResponse {
 }    
 
 
-export interface PayoutDestination {
-    type: 'bank_account' | 'mobile_money';
-    amount: number;
-    currency: string;
-    narration?: string;
-    bank_account?: {
-        bank: string;
-        account: string;
-        account_name?: string;
-    };
-    mobile_money?: {
-        operator: string;
-        mobile_number: string;
-    };
-    customer: {
-        name?: string;
-        email: string;
-    };
-}
+// export interface PayoutDestination {
+//     type: 'bank_account' | 'mobile_money';
+//     amount: number;
+//     currency: string;
+//     narration?: string;
+//     bank_account?: {
+//         bank: string;
+//         account: string;
+//         account_name?: string;
+//     };
+//     mobile_money?: {
+//         operator: string;
+//         mobile_number: string;
+//     };
+//     customer: {
+//         name?: string;
+//         email: string;
+//     };
+// }
 
 export interface PayoutRequest {
-    reference: string;
-    destination: PayoutDestination;
-    metadata?: Record<string, any>;
+    source: "balance";
+    // destination: PayoutDestination;
+    currency: "NGN";
+    amount : number;
+    recipient: string;
 }
+
+// export interface PayoutResponse {
+//     status: boolean;
+//     message: string;
+//     data: {
+//         reference: string;
+//         status: string;
+//         amount: number;
+//         fee: number;
+//         currency: string;
+//         narration: string;
+//         customer: {
+//             name: string;
+//             email: string;
+//         };
+//         destination: {
+//             type: string;
+//             bank_account?: {
+//                 bank: string;
+//                 account: string;
+//             };
+//             mobile_money?: {
+//                 operator: string;
+//                 mobile_number: string;
+//             };
+//         };
+//         transaction_date: string;
+//         transaction_reference: string;
+//     };
+// }
 
 export interface PayoutResponse {
     status: boolean;
     message: string;
     data: {
-        reference: string;
-        status: string;
+        integration: number;
+        domain: string;
         amount: number;
-        fee: number;
         currency: string;
-        narration: string;
-        customer: {
-            name: string;
-            email: string;
-        };
-        destination: {
-            type: string;
-            bank_account?: {
-                bank: string;
-                account: string;
-            };
-            mobile_money?: {
-                operator: string;
-                mobile_number: string;
-            };
-        };
-        transaction_date: string;
-        transaction_reference: string;
+        source: string;
+        reason: string;
+        recipient: number;
+        status: string;
+        transfer_code: string;
+        id: number;
+        createdAt: string;
+        updatedAt: string;
     };
 }

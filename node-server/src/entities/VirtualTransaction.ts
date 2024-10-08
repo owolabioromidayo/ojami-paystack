@@ -1,5 +1,4 @@
 import { Entity, PrimaryKey, Property, ManyToOne, DecimalType } from "@mikro-orm/core";
-import { VirtualTransactionStatus, TransactionType } from "../types";
 import { VirtualWallet } from "./VirtualWallet";
 
 //TODO: transaction type, from and to

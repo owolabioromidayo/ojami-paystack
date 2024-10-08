@@ -22,8 +22,65 @@ router.get("/users/:id", getUser);
 
 async function registerUser(req: Request, res: Response) {
     const { firstname, lastname, birthDate, phoneNumber, email, password } = req.body;
+    // Validate required fields
+    if (!firstname || !lastname || !phoneNumber || !email) {
+        return res.status(400).json({
+            errors: [
+                { field: "firstname", message: "First name is required" },
+                { field: "lastname", message: "Last name is required" },
+                { field: "phoneNumber", message: "Phone number is required" },
+                { field: "email", message: "Email is required" }
+            ].filter(error => !req.body[error.field])
+        });
+    }
 
-    const redis = (req as RequestWithContext).redis;
+    // Validate firstname and lastname
+    if (firstname.length < 2 || lastname.length < 2) {
+        return res.status(400).json({
+            errors: [
+                { field: "firstname", message: "First name must be at least 2 characters long" },
+                { field: "lastname", message: "Last name must be at least 2 characters long" }
+            ].filter(error => req.body[error.field].length < 2)
+        });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({
+            errors: [{ field: "email", message: "Invalid email format" }]
+        });
+    }
+
+    // Validate phone number (assuming Nigerian format)
+    const phoneRegex = /^(\+234|0)[789]\d{9}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+        return res.status(400).json({
+            errors: [{ field: "phoneNumber", message: "Invalid phone number format" }]
+        });
+    }
+
+    // Validate birthDate if provided
+    if (birthDate) {
+        const birthDateObj = new Date(birthDate);
+        if (isNaN(birthDateObj.getTime())) {
+            return res.status(400).json({
+                errors: [{ field: "birthDate", message: "Invalid date format" }]
+            });
+        }``
+
+        // Check if user is at least 18 years old
+        const minimumAge = 18;
+        const currentDate = new Date();
+        const minimumBirthDate = new Date(currentDate.getFullYear() - minimumAge, currentDate.getMonth(), currentDate.getDate());
+        
+        if (birthDateObj > minimumBirthDate) {
+            return res.status(400).json({
+                errors: [{ field: "birthDate", message: `User must be at least ${minimumAge} years old` }]
+            });
+        }
+    }
+
     const em = (req as RequestWithContext).em;
 
     // Validate user input
@@ -37,6 +94,44 @@ async function registerUser(req: Request, res: Response) {
 
         const user = new User(firstname, lastname, phoneNumber, email, hashedPassword);
         user.birthDate = birthDate;
+
+        // Create customer on Paystack
+        const customerPayload = {
+            email: user.email,
+            first_name: user.firstname,
+            last_name: user.lastname,
+            phone: user.phoneNumber
+        };
+
+        try {
+            const resp = await fetch("https://api.paystack.co/customer", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+                },
+                body: JSON.stringify(customerPayload)
+            });
+
+            if (!resp.ok) {
+                throw new Error("Failed to create Paystack customer");
+            }
+
+            const data = await resp.json();
+
+            if (data.status) {
+                user.customer_code = data.data.customer_code;
+                user.customer_id = data.data.id;
+            } else {
+                throw new Error("Paystack customer creation failed");
+            }
+        } catch (error) {
+            console.error("Error creating Paystack customer:", error);
+            // Note: We're not returning here, as we still want to create the user
+            // even if Paystack customer creation fails
+        }
+
+
         await em.fork({}).persistAndFlush(user);
 
         // Set the session and return the user

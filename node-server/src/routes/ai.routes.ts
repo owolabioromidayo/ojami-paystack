@@ -27,7 +27,7 @@ const URL_PREFIX = `${process.env.DOMAIN_URL}/p/`;
 const router = express.Router();
 const openaiKey = process.env.OPENAI_API_KEY;
 
-const llm = new ChatOpenAI({ model: "gpt-3.5-turbo" });
+const llm = new ChatOpenAI({ model: "gpt-4o-mini", temperature: 0.2 });
 
 let vectorstore: FaissStore;
 
@@ -113,6 +113,36 @@ async function queryCgpt(prompt: string, userQ: string) {
 }
 
 async function generateStartResponse(conversation: any[], metadata: any) {
+
+    // We want to load the business's information into the model
+    // This includes:
+    // - Business catalogue
+    // - Business description
+    // - Business name
+    // - Business logo
+    // - Business address
+    // - Business phone number
+    // - Business email
+    // - Tone of conversation (formal to casual)
+    // - Talkativeness vs brevity (verbose to concise)
+    // - Professionalism level (highly professional to relaxed)
+    // - Language style (standard English to pidgin)
+    // 
+    // Additional customizations on a sliding scale could include:
+    // - Humor level (no humor to very humorous)
+    // - Technical language use (layman's terms to industry-specific jargon)
+    // - Emoji usage (no emojis to frequent emoji use)
+    // - Cultural references (minimal to extensive local cultural references)
+    // - Personalization (generic to highly personalized based on user data)
+    // - Response speed (thoughtful and slow to quick and snappy)
+    // - Upselling tendency (no upselling to frequent product recommendations)
+    // - Problem-solving approach (directive to collaborative)
+    
+    // TODO: Implement function to load business info and customization preferences
+
+    
+
+
     const resp = await queryCgpt(START_PROMPT, "");
     metadata.state = "filtering_loop";
     return { resp, metadata };

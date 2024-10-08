@@ -2,11 +2,11 @@ import { Entity, PrimaryKey, Property, OneToOne, Collection, ManyToOne, OneToMan
 import { User } from "./User";
 import { VirtualTransaction } from "./VirtualTransaction";
 import { PendingBalance } from "./PendingBalance";
+import { Transaction } from "./Transaction";
 
 
 @Entity()
 export class VirtualWallet {
-
 
     @PrimaryKey()
     id!: number;
@@ -28,9 +28,11 @@ export class VirtualWallet {
     @OneToOne(() => User, user => user.virtualWallet)
     user!: User;
 
+    @OneToMany(() => Transaction, transaction => transaction.virtualWallet)
+    transactions = new Collection<Transaction>(this);
 
     @OneToMany(() => VirtualTransaction, transaction => transaction.sendingWallet)
-    transactions = new Collection<VirtualTransaction>(this);
+    virtualTransactions = new Collection<VirtualTransaction>(this);
 
 
     constructor(user: User) {

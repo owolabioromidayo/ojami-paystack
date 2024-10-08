@@ -26,6 +26,12 @@ export class User {
   @Property()
   birthDate?: string;
 
+  @Property()
+  customer_id?: string;
+
+  @Property()
+  customer_code?: string;
+
   @Property({ unique: true })
   phoneNumber: string;
 
@@ -39,10 +45,26 @@ export class User {
   isDisabled = false;
 
   @Property()
+  isValidated = false;
+  @Property()
   profileImgUrl = "https://i.imgur.com/OQENGf1.jpeg";
 
   @OneToMany(() => Storefront, storefront => storefront.user)
   storefronts = new Collection<Storefront>(this);
+
+  //TODO
+  //   @Property({ type: 'json' })
+  // customer!: {
+  //   id: number;
+  //   firstName?: string;
+  //   lastName?: string;
+  //   email: string;
+  //   customerCode: string;
+  //   phone?: string;
+  //   metadata?: any;
+  //   riskAction: string;
+  //   internationalFormatPhone?: string;
+  // };
 
   // @OneToMany(() => Cart, cart => cart.user)
   // cart = new Collection<Cart>(this);
@@ -59,7 +81,7 @@ export class User {
   @OneToOne(() => KYB, kyb => kyb.user, { owner: true })
   KYB?: KYB;
 
-  @OneToMany(() => Transaction, transaction => transaction.sendingUser)
+  @OneToMany(() => Transaction, transaction => transaction.user)
   transactions = new Collection<Transaction>(this);
 
 
@@ -69,6 +91,8 @@ export class User {
     this.email = email;
     this.phoneNumber = phoneNumber;
     this.passwordHash = passwordHash;
+
+    this.isValidated = false;
   }
 
 }

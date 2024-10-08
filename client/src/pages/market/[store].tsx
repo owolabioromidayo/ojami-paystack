@@ -68,18 +68,20 @@ const StorePage = () => {
     }
   }, [store, storename]);
 
-  const averageRating =
-    store?.ratings.length! > 0
-      ? (
-          store?.ratings?.reduce(
-            (acc: any, curr) => parseInt(acc) + Number(curr),
-            0
-          )! / store?.ratings?.length!
-        ).toFixed(1)
-      : "0.0";
+  // const averageRating =
+  //   store?.ratings.length! > 0
+  //     ? (
+  //         store?.ratings?.reduce(
+  //           (acc: any, curr) => parseInt(acc) + Number(curr),
+  //           0
+  //         )! / store?.ratings?.length!
+  //       ).toFixed(1)
+  //     : "0.0";
+
+  const averageRating = 4.5;
 
   const [value, setValue] = React.useState("");
-  const [price, setPrice] = React.useState<Array<number>>([0,100]);
+  const [price, setPrice] = React.useState<Array<number>>([0, 100]);
 
   const [onSale, setOnSale] = React.useState(false);
   const [inStock, setInStock] = React.useState(false);
@@ -203,9 +205,9 @@ const StorePage = () => {
                 <PopoverTrigger>
                   <Button
                     border="2px solid #000"
-                    bg={price[0] > 0 || price[1] <100 ? "orange" : "white"}
+                    bg={price[0] > 0 || price[1] < 100 ? "orange" : "white"}
                     _hover={{
-                      bg:  price[0] > 0 || price[1] <100 ? "orange" : "gray.300",
+                      bg: price[0] > 0 || price[1] < 100 ? "orange" : "gray.300",
                     }}
                     rounded="9px"
                     rightIcon={<IoChevronDown />}
@@ -234,12 +236,12 @@ const StorePage = () => {
                       align="center"
                       gap={2}
                     >
-                        <Input value={price[0]} />
-                        {" - "}
-                        <Input value={price[1]} />
+                      <Input value={price[0]} />
+                      {" - "}
+                      <Input value={price[1]} />
 
                     </Flex>
-                    
+
                     <Flex
                       w="full"
                       mt={7}
@@ -277,16 +279,16 @@ const StorePage = () => {
           </Button>
         </Flex>
         {store?.products?.length! < 1 ? (
-            <Flex gap={2} align="center">
-              <Icon as={TbInfoTriangle} />
-              <Text>This store has no products yet</Text>
-            </Flex>
-        ): (
-        <SimpleGrid minChildWidth={{ base: "150px", lg: '210px'}} spacing='5px' mt={5}>
+          <Flex gap={2} align="center">
+            <Icon as={TbInfoTriangle} />
+            <Text>This store has no products yet</Text>
+          </Flex>
+        ) : (
+          <SimpleGrid minChildWidth={{ base: "150px", lg: '210px' }} spacing='5px' mt={5}>
             {store?.products?.map((item) => (
-                <ProductItem product={item} key={item.id} />
+              <ProductItem product={item} key={item.id} />
             ))}
-        </SimpleGrid>
+          </SimpleGrid>
 
         )}
 
