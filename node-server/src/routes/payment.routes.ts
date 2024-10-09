@@ -83,8 +83,8 @@ router.get("/vouchers/me", isAuth, fetchMyVouchers);
 router.post("/vouchers/redeem", isAuth, redeemVoucher);
 
 
-
-// router.post("/transaction/initialize", isAuth, initializeTransaction);
+//payin
+router.post("/transaction/initialize", isAuth, initializeTransaction);
 router.get("/transaction/verify/:reference", verifyTransaction);
 
 
@@ -718,13 +718,27 @@ async function redeemVoucher(req: Request, res: Response) {
 }
 
 async function initializePayout(req: Request, res: Response) {
-  const { amount } = req.body;
+  const { amount, account_number, bank_code } = req.body;
 
   if (!amount || isNaN(Number(amount))) {
     return res
       .status(400)
       .json({ errors: [{ field: "amount", message: "Amount is not valid" }] });
   }
+
+  if (!account_number || isNaN(Number(account_number))) {
+    return res
+      .status(400)
+      .json({ errors: [{ field: "account_number", message: "Account number is not valid" }] });
+  }
+
+  if (!bank_code || isNaN(Number(bank_code))) {
+    return res
+      .status(400)
+      .json({ errors: [{ field: "bank_code", message: "Bank code is not valid" }] });
+  }
+
+
 
   const em = (req as RequestWithContext).em;
 
@@ -739,11 +753,48 @@ async function initializePayout(req: Request, res: Response) {
       return res.status(400).json({ errors: [{ message: "Insufficient balance" }] });
     }
 
+    const recipientPayload = {
+      type: "nuban",
+      name: `${user.firstname} ${user.lastname}`,
+      account_number: account_number.toString(),
+      bank_code: bank_code.toString(),
+      currency: "NGN"
+    };
+
+    const recipientResp = await fetch(
+      "https://api.paystack.co/transferrecipient",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${paystack_token}`,
+        },
+        body: JSON.stringify(recipientPayload),
+      }
+    );
+
+    if (!recipientResp.ok) {
+      const errorData = await recipientResp.json().catch(() => ({}));
+      return res.status(500).json({ errors: [{ message: "Failed to create transfer recipient", details: errorData }] });
+    }
+
+    const recipientData = await recipientResp.json();
+
+    if (!recipientData.status) {
+      return res.status(500).json({ errors: [{ message: recipientData.message || "Failed to create transfer recipient" }] });
+    }
+
+    const recipient_code = recipientData.data.recipient_code;
+
+    if (!recipient_code) {
+      return res.status(500).json({ errors: [{ message: "Recipient code not found in the response" }] });
+    }
+
     const payload: PayoutRequest = {
       source: "balance",
       currency: "NGN",
       amount: amount,
-      recipient: "TODO",
+      recipient: recipient_code 
     };
 
     const resp = await fetch(
@@ -871,66 +922,79 @@ async function finalizePayout(req: Request, res: Response) {
   }
 }
 
-// async function initializeTransaction(req: Request, res: Response) {
-//   const em = (req as RequestWithContext).em;
-//   const { amount, orderId } = req.body;
+async function initializeTransaction(req: Request, res: Response) {
+  const em = (req as RequestWithContext).em;
+  const { amount } = req.body;
 
-//   if (!amount || isNaN(Number(amount))) {
-//     return res.status(400).json({ errors: [{ field: "amount", message: "Invalid amount" }] });
-//   }
+  if (!amount || isNaN(Number(amount))) {
+    return res.status(400).json({ errors: [{ field: "amount", message: "Invalid amount" }] });
+  }
+
+  try {
+    const user = await em.fork({}).findOneOrFail(User, { id: req.session.userid }, { populate: ["virtualWallet"] });
+
+    const payload = {
+      amount: Math.round(Number(amount) * 100), // Convert to kobo
+      email: user.email,
+      reference: uuidv4(),
+      // callback_url: `${process.env.DOMAIN_URL}/api/webhooks/pay_in`,
+      callback_url: `${process.env.FE_DOMAIN_URL}`,
+    };
+
+    const resp = await fetch(
+      "https://api.paystack.co/transaction/initialize",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${paystack_token}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!resp.ok) {
+      const errorData = await resp.json().catch(() => ({}));
+      return res.status(500).json({ 
+        errors: [{ message: "Failed to initialize transaction", details: errorData }] 
+      });
+    }
+
+    const data = await resp.json();
+
+    if (data.status) {
+      const transaction = new Transaction(user, user.virtualWallet, {
+        status: "pending",
+        amount: Number(amount),
+        created_at: new Date(),
+        currency: "NGN",
+        reference: payload.reference,
+      }, "payin");
 
 
+        //cant get the webhooks because we arent hosted rn  
+      
+        // transaction.status = "success";
+        // user.virtualWallet.balance += transaction.amount;
+        // await em.fork({}).persistAndFlush([transaction, transaction.virtualWallet] );
 
-//   try {
-//     const user = await em.fork({}).findOneOrFail(User, { id: req.session.userid });
-//     const order = await em.fork({}).findOneOrFail(Order, { id: Number(orderId) });
 
-//     const payload = {
-//       amount: Math.round(Number(amount) * 100), // Convert to kobo
-//       email: user.email,
-//       reference: uuidv4(),
-//       callback_url: `${process.env.DOMAIN_URL}/payment/verify/${orderId}`,
-//     };
+      await em.fork({}).persistAndFlush(transaction);
 
-//     const resp = await fetch(
-//       "https://api.paystack.co/transaction/initialize",
-//       {
-//         method: "POST",
-//         headers: {
-//           "Content-Type": "application/json",
-//           Authorization: `Bearer ${paystack_token}`,
-//         },
-//         body: JSON.stringify(payload),
-//       }
-//     );
-
-//     if (!resp.ok) {
-//       const errorData = await resp.json().catch(() => ({}));
-//       return res.status(500).json({ 
-//         errors: [{ message: "Failed to initialize transaction", details: errorData }] 
-//       });
-//     }
-
-//     const data = await resp.json();
-
-//     if (data.status) {
-//       order.paymentReference = payload.reference;
-//       await em.fork({}).persistAndFlush(order);
-
-//       return res.status(200).json({
-//         message: "Transaction initialized",
-//         data: data.data,
-//       });
-//     } else {
-//       return res.status(500).json({ errors: [{ message: data.message }] });
-//     }
-//   } catch (err: any) {
-//     console.error("Error initializing transaction:", err);
-//     return res.status(500).json({ 
-//       errors: [{ message: "Failed to initialize transaction", error: err.message }] 
-//     });
-//   }
-// }
+      return res.status(200).json({
+        message: "Transaction initialized",
+        data: data.data,
+      });
+    } else {
+      return res.status(500).json({ errors: [{ message: data.message }] });
+    }
+  } catch (err: any) {
+    console.error("Error initializing transaction:", err);
+    return res.status(500).json({ 
+      errors: [{ message: "Failed to initialize transaction", error: err.message }] 
+    });
+  }
+}
 
 async function verifyTransaction(req: Request, res: Response) {
   const em = (req as RequestWithContext).em;
@@ -964,7 +1028,7 @@ async function verifyTransaction(req: Request, res: Response) {
         await em.fork({}).persistAndFlush([transaction, transaction.virtualWallet] );
       }
       
-
+      //TODO: hanlde if transaction failed? 
       return res.status(200).json({
         message: "Transaction verified successfully",
         data: data.data,

@@ -61,25 +61,25 @@ async function registerUser(req: Request, res: Response) {
     }
 
     // Validate birthDate if provided
-    if (birthDate) {
-        const birthDateObj = new Date(birthDate);
-        if (isNaN(birthDateObj.getTime())) {
-            return res.status(400).json({
-                errors: [{ field: "birthDate", message: "Invalid date format" }]
-            });
-        }``
+    // if (birthDate) {
+    //     const birthDateObj = new Date(birthDate);
+    //     if (isNaN(birthDateObj.getTime())) {
+    //         return res.status(400).json({
+    //             errors: [{ field: "birthDate", message: "Invalid date format" }]
+    //         });
+    //     }``
 
-        // Check if user is at least 18 years old
-        const minimumAge = 18;
-        const currentDate = new Date();
-        const minimumBirthDate = new Date(currentDate.getFullYear() - minimumAge, currentDate.getMonth(), currentDate.getDate());
+    //     // Check if user is at least 18 years old
+    //     const minimumAge = 18;
+    //     const currentDate = new Date();
+    //     const minimumBirthDate = new Date(currentDate.getFullYear() - minimumAge, currentDate.getMonth(), currentDate.getDate());
         
-        if (birthDateObj > minimumBirthDate) {
-            return res.status(400).json({
-                errors: [{ field: "birthDate", message: `User must be at least ${minimumAge} years old` }]
-            });
-        }
-    }
+    //     if (birthDateObj > minimumBirthDate) {
+    //         return res.status(400).json({
+    //             errors: [{ field: "birthDate", message: `User must be at least ${minimumAge} years old` }]
+    //         });
+    //     }
+    // }
 
     const em = (req as RequestWithContext).em;
 

@@ -89,7 +89,7 @@ const Checkout = () => {
             isInstantPurchase: false,
             amount:
               products?.find((p) => p.id === order.product)?.price! *
-                order.count +
+              order.count +
               2500 +
               products?.find((p) => p.id === order.product)?.price! * 0.05,
           }),
@@ -178,7 +178,7 @@ const Checkout = () => {
             orderId: order.id,
             amount:
               products?.find((p) => p.id === order.product)?.price! *
-                order.count +
+              order.count +
               2500 +
               products?.find((p) => p.id === order.product)?.price! * 0.05,
           }),
@@ -228,7 +228,7 @@ const Checkout = () => {
   };
 
   return (
-    <Flex direction="column"h="100vh" align="center">
+    <Flex direction="column" h="100vh" align="center">
       <Flex
         borderBottom="2px solid #000"
         w="full"
@@ -393,7 +393,7 @@ const Checkout = () => {
               >
                 Pay with Oja Wallet
               </FancyButton>
-              <FancyButton
+              {/* <FancyButton
                 w="180px"
                 bg="/assets/buttons/oja-sweet-purple.svg"
                 h="80px"
@@ -401,7 +401,7 @@ const Checkout = () => {
                 fontSize={{ base: "12px", md: "16px" }}
               >
                 Pay with Kora
-              </FancyButton>
+              </FancyButton> */}
             </Flex>
             <Collapse in={isAOpen} animateOpacity>
               <Box

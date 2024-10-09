@@ -561,7 +561,7 @@ export const SignInModal: React.FC<SignInProps> = ({ isOpen, onClose }) => {
                           )}
                         </Field>
 
-                        <Field name="birthDate">
+                        {/* <Field name="birthDate">
                           {({ field, form }: any) => (
                             <FormControl
                               mt={5}
@@ -587,7 +587,7 @@ export const SignInModal: React.FC<SignInProps> = ({ isOpen, onClose }) => {
                               </FormErrorMessage>
                             </FormControl>
                           )}
-                        </Field>
+                        </Field> */}
                       </Flex>
 
                       <Field name="password">

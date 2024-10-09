@@ -42,10 +42,14 @@ export class User {
   passwordHash!: string;
 
   @Property()
-  isDisabled = false;
+  isDisabled: boolean = false;
 
   @Property()
-  isValidated = false;
+  isValidated: boolean = false;
+
+  @Property()
+  identificationReason?: string;
+
   @Property()
   profileImgUrl = "https://i.imgur.com/OQENGf1.jpeg";
 
@@ -92,7 +96,6 @@ export class User {
     this.phoneNumber = phoneNumber;
     this.passwordHash = passwordHash;
 
-    this.isValidated = false;
   }
 
 }

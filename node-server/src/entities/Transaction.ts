@@ -30,6 +30,9 @@ export class Transaction {
   channel?: string;
 
   @Property()
+  failureReason?: string;
+
+  @Property()
   currency!: string;
 
   @ManyToOne(() => User)

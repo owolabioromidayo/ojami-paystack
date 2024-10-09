@@ -1,179 +1,102 @@
 
 import express, { Request, Response } from "express";
-import { GetQueryChargeResponse, RequestWithContext, TransactionStatus } from "../types";
+import {  RequestWithContext } from "../types";
 import { Transaction } from "../entities/Transaction";
 
-import { KORAPAY_TOKEN } from "../constants";
-import { PayInTransaction } from "../entities/PayInTransaction";
+
 import { User } from "../entities/User";
 
 const router = express.Router();
 const crypto = require('crypto');
 
-const secretKey = process.env.KORAPAY_TOKEN;
 
-router.post("/bank_transfer", paymentWebhookHandler);
-router.post("/checkout", checkoutWebhookHandler);
+router.post("/", paystackWebhookHandler);
 
 
 
-async function paymentWebhookHandler(req: Request, res: Response) {
+async function paystackWebhookHandler(req: Request, res: Response) {
 
-    const hash = crypto.createHmac('sha256', secretKey).update(JSON.stringify(req.body.data)).digest('hex');
-    if (hash === req.headers['x-korapay-signature']) {
-
-        const { event, data } = req.body;
+    const hash = crypto.createHmac('sha256', process.env.PAYSTACK_SECRET_KEY).update(JSON.stringify(req.body.data)).digest('hex');
+    if (hash === req.headers['x-paystack-signature']) {
 
         const em = (req as RequestWithContext).em;
-
+        const event = req.body.event;
+        const data = req.body.data;
 
         try {
-
-            if (event === 'charge.success') {
-                const { reference, currency, amount, fee, status } = data;
-
-
-                if (status === "success") {
-                    let transaction = await em.fork({}).findOneOrFail(Transaction, { id: reference });
-
-                    //REQUERY TRANSACTION
-
-                    const resp = await fetch(`https://api.korapay.com/merchant/api/v1/charges/${reference}`, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${KORAPAY_TOKEN}`
-                        },
-                    });
-
-                    if (!resp.ok) {
-                        return res.status(500).json({ errors: [{ message: 'Could not verify transaction' }] });
+            switch (event) {
+                case 'customeridentification.failed':
+                    console.log('Customer identification failed:', data);
+                    const failedUser = await em.fork({}).findOne(User, { email: data.email });
+                    if (failedUser) {
+                        failedUser.isValidated = false;
+                        failedUser.identificationReason = data.reason;
+                        await em.fork({}).persistAndFlush(failedUser);
                     }
+                    break;
 
-                    const data = await resp.json() as GetQueryChargeResponse;
-
-
-                    if (data.status !== true) {
-                        return res.status(500).json({ errors: [{ message: 'Could not verify transaction' }] });
+                case 'customeridentification.success':
+                    const successUser = await em.fork({}).findOne(User, { email: data.email });
+                    if (successUser) {
+                        successUser.isValidated = true;
+                        await em.fork({}).persistAndFlush(successUser);
                     }
+                    break;
 
-                    const amount_paid = Number(data.data.amount_paid);
-                    const fee = Number(data.data.fee);
-                    if (isNaN(amount_paid)) {
-                        return res.status(500).json({ errors: [{ message: 'Could not verify transaction. Error in payload verification from payment provider. ' }] });
+
+                // transfer == payout 
+                case 'transfer.success':
+                    const successTransaction = await em.fork({}).findOne(Transaction, { reference: data.reference }, { populate: ['user.virtualWallet'] });
+                    if (successTransaction) {
+                        successTransaction.status = 'success';
+                        successTransaction.paidAt = new Date();
+                        successTransaction.user.virtualWallet.balance -= (successTransaction.amount / 100);
+                        await em.fork({}).persistAndFlush([successTransaction, successTransaction.user.virtualWallet]);
                     }
+                    break;
 
-                    if (isNaN(fee)) {
-                        return res.status(500).json({ errors: [{ message: 'Could not verify transaction. Error in payload verification from payment provider.' }] });
+                case 'transfer.failed':
+                    const failedTransaction = await em.fork({}).findOne(Transaction, { reference: data.reference });
+                    if (failedTransaction) {
+                        failedTransaction.status = 'failed';
+                        failedTransaction.failureReason = data.status;
+                        await em.fork({}).persistAndFlush(failedTransaction);
                     }
+                    break;
 
 
-                    transaction.status = data.data.status as TransactionStatus;
-                    transaction.amountPaid = amount_paid;
-                    transaction.fee = fee;
+                // charge == payin
+                case 'charge.success':
+                    const { reference, amount, currency, customer, paid_at, channel } = data;
+                    const chargeTransaction = await em.fork({}).findOne(Transaction, { id: reference }, { populate: ['user.virtualWallet'] });
 
+                    if (chargeTransaction) {
+                        chargeTransaction.amount = Number(amount) / 100; // Convert from kobo to Naira
+                        chargeTransaction.status = 'success';
+                        chargeTransaction.paidAt = new Date(paid_at);
+                        chargeTransaction.channel = channel;
+                        // Update user's virtual wallet
+                        chargeTransaction.user.virtualWallet.balance += chargeTransaction.amount;
 
-                    //TODO: get user virtual account and update their balance with amount
+                        await em.fork({}).persistAndFlush([chargeTransaction, chargeTransaction.user.virtualWallet]);
+                    }
+                    break;
 
-                    await em.fork({}).persistAndFlush(transaction);
-                    res.status(200).send('Webhook received successfully');
-
-
-                } else {
-
-                    //documentation does not explain this case
-                    res.status(200).send('Webhook received successfully');
-
-                }
-
-
-            } else if (event === 'charge.failed') {
-
-                const { reference, currency, amount, fee, status } = data;
-
-                // if (status === "success") {
-                let transaction = await em.fork({}).findOneOrFail(Transaction, { id: reference });
-
-                transaction.status = TransactionStatus.FAILED;
-                await em.fork({}).persistAndFlush(transaction);
-                res.status(200).send('Webhook received successfully');
-
-
-                // } else {
-                //     //documentation does not explain this case
-                //     res.status(200).send('Webhook received successfully');
-                // }
-
+                default:
+                    console.log('Unhandled event type:', event);
             }
-            else {
-                res.status(200).send('Event type not handled');
-            }
+
+            res.status(200).send('Webhook processed successfully');
         } catch (error) {
             console.error('Error processing webhook:', error);
             res.status(500).send('Error processing webhook');
-
         }
     }
 }
 
-async function checkoutWebhookHandler(req: Request, res: Response) {
-
-    const hash = crypto.createHmac('sha256', secretKey).update(JSON.stringify(req.body.data)).digest('hex');
-    if (hash === req.headers['x-korapay-signature']) {
-
-        const { event, data } = req.body;
-
-        const em = (req as RequestWithContext).em;
+router.post('/paystack', paystackWebhookHandler);
 
 
-        try {
 
-            if (event === 'charge.success') {
-                const { reference, currency, amount, fee, status } = data;
-
-
-                if (isNaN(Number(amount))) {
-                    return res.status(400).json({ errors: [{ field: 'amount', message: 'Invalid amount' }] });
-                }
-
-                if (status === "success") {
-                    let transaction = await em.fork({}).findOneOrFail(PayInTransaction, { id: reference }, { populate: ['user.virtualWallet.balance'] });
-                    transaction.amount = Number(amount);  //already configured in earlier route
-                    transaction.status = TransactionStatus.COMPLETED;
-
-                    // get the uservs virtualWallet and update accordingly
-                    transaction.user.virtualWallet.balance += Number(amount);
-
-
-                    await em.fork({}).persistAndFlush([transaction, transaction.user.virtualWallet]);
-                    res.status(200).send('Webhook received successfully');
-
-
-                } else {
-                    //documentation does not explain this case
-                    res.status(200).send('Webhook received successfully');
-
-                }
-
-
-            } else if (event === 'charge.failed') {
-
-                const { reference, currency, amount, fee, status } = data;
-                let transaction = await em.fork({}).findOneOrFail(PayInTransaction, { id: reference });
-                transaction.amount = amount;  //already configured in earlier route
-                transaction.status = TransactionStatus.FAILED;
-
-
-                res.status(200).send('Webhooked processed.');
-            }
-            else {
-                res.status(200).send('Event type not handled');
-            }
-        } catch (error) {
-            console.error('Error processing webhook:', error);
-            res.status(500).send('Error processing webhook');
-
-        }
-    }
-}
 
 export default router;

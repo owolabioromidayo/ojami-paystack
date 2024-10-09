@@ -29,7 +29,9 @@ import FancyButton from "../ui/fancy-button";
 import { SignInModal } from "../utils/signin-modal";
 import {
   IoCamera,
+  IoCashOutline,
   IoFileTrayOutline,
+  IoListOutline,
   IoPerson,
   IoPersonOutline,
   IoSearch,
@@ -37,6 +39,7 @@ import {
   IoSparklesOutline,
   IoTicket,
   IoTicketOutline,
+  IoWalletOutline,
 } from "react-icons/io5";
 import { OjaContext } from "../provider";
 import { useRouter } from "next/router";
@@ -359,10 +362,86 @@ export const MarketLayout: React.FC<MarketLayoutProps> = ({ children }) => {
                       />
                       <Text fontWeight={500}>Orders</Text>
                     </Flex>
+
+
+                    <Flex
+                      align="center"
+                      gap={2}
+                      p={2}
+                      _hover={{ bg: "#f0f0f0" }}
+                      rounded="lg"
+                      cursor="pointer"
+                      onClick={() => router.push("/customer/transaction-history")}
+                    >
+                      <Icon
+                        as={IoListOutline}
+                        fontSize={36}
+                        p={2}
+                        border="1px solid #e2e2e2"
+                        rounded="4"
+                      />
+                      <Text fontWeight={500}>Transaction History</Text>
+                    </Flex>
+                    <Flex
+                      align="center"
+                      gap={2}
+                      p={2}
+                      _hover={{ bg: "#f0f0f0" }}
+                      rounded="lg"
+                      cursor="pointer"
+                      onClick={() => router.push("/customer/virtual-transaction-history")}
+                    >
+                      <Icon
+                        as={IoWalletOutline}
+                        fontSize={36}
+                        p={2}
+                        border="1px solid #e2e2e2"
+                        rounded="4"
+                      />
+                      <Text fontWeight={500}>Virtual Transaction History</Text>
+                    </Flex>
+                    <Flex
+                      align="center"
+                      gap={2}
+                      p={2}
+                      _hover={{ bg: "#f0f0f0" }}
+                      rounded="lg"
+                      cursor="pointer"
+                      onClick={() => router.push("/customer/request-payout")}
+                    >
+                      <Icon
+                        as={IoCashOutline}
+                        fontSize={36}
+                        p={2}
+                        border="1px solid #e2e2e2"
+                        rounded="4"
+                      />
+                      <Text fontWeight={500}>Request Payout</Text>
+                    </Flex>
+
+                    <Flex
+                      align="center"
+                      gap={2}
+                      p={2}
+                      _hover={{ bg: "#f0f0f0" }}
+                      rounded="lg"
+                      cursor="pointer"
+                      onClick={() => router.push("/customer/pay-in-wallet")}
+                    >
+                      <Icon
+                        as={IoWalletOutline}
+                        fontSize={36}
+                        p={2}
+                        border="1px solid #e2e2e2"
+                        rounded="4"
+                      />
+                      <Text fontWeight={500}>Pay In to Wallet</Text>
+                    </Flex>
+
                   </Box>
                 </Collapse>
                 <IconButton
-                display={{ base: "flex", lg: "none" }}
+                  display={{ base: "flex", lg: "none" }}
                   onClick={() => onChatOpen()}
                   _hover={{ bg: "orange.100" }}
                   colorScheme="orange"
