@@ -167,7 +167,8 @@ export const createApp = async () => {
   app.set("trust proxy", 1);
   app.use(cors({
     credentials: true,
-    origin: [`http://localhost:${process.env.PORT || 3000}`, 'https://ojami.shop']
+    origin: [`http://localhost:${process.env.PORT || 3000}`, 'https://ojami-paystack-bwjp.vercel.app']
+    //origin: (origin: any, callback: any ) => {callback(null, true); }
   }));
 
   app.use(helmet());
@@ -177,7 +178,7 @@ export const createApp = async () => {
     session({
       store: redisStore,
       name: process.env.COOKIE_NAME,
-      sameSite: "None",
+      //sameSite: "None",
       secret: process.env.SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
@@ -186,11 +187,12 @@ export const createApp = async () => {
         httpOnly: true,
         secure: false,
         maxAge: 1000 * 60 * 60 * 1024,
+	//sameSite: 'lax'
       },
     } as any)
   );
 
-  // initAppData(em);
+// initAppData(em);
 
   app.get('/', (req, res) => {
     res.send('Welcome to api.ojami.shop');
@@ -214,9 +216,9 @@ export const createApp = async () => {
 const startServer = async () => {
   const app = await createApp();
 
-  const PORT = process.env.PORT || 4000;
+  const PORT = Number(process.env.PORT) || 4000;
 
-  app.listen(PORT, () => {
+  app.listen(PORT,'0.0.0.0', () => {
     console.log(`Server ready on http://localhost:${PORT}`);
   });
 }
