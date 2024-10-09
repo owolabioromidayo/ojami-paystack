@@ -18,7 +18,7 @@ import authRoutes from './routes/auth.routes';
 import identityRoutes from './routes/identity.routes';
 import paymentRoutes from './routes/payment.routes';
 import ecommerceRoutes from './routes/ecommerce.routes';
-import aiRoutes from './routes/ai.routes';
+import aiRoutes, { generateEmbeddingsSync } from './routes/ai.routes';
 import webhookRoutes from './routes/webhook.routes';
 import { isAuth } from './middleware/isAuth';
 import { ProductLink } from "./entities/ProductLink";
@@ -33,12 +33,12 @@ import { EntityManager } from '@mikro-orm/core';
 import { Tag } from "./entities/Tag";
 
 
-const https = require("https");
+// const https = require("https");
 
-const options = {
-  key: fs.readFileSync(path.join(__dirname, "localhost-key.pem")),
-  cert: fs.readFileSync(path.join(__dirname, "localhost.pem")),
-};
+// const options = {
+//   key: fs.readFileSync(path.join(__dirname, "localhost-key.pem")),
+//   cert: fs.readFileSync(path.join(__dirname, "localhost.pem")),
+// };
 
 
 console.log(process.env.NODE_ENV);
@@ -197,12 +197,15 @@ export const createApp = async () => {
         httpOnly: true,
         secure: false,
         maxAge: 1000 * 60 * 60 * 1024,
-	//sameSite: 'lax'
+        //sameSite: 'lax'
       },
     } as any)
   );
 
-// initAppData(em);
+
+
+  await generateEmbeddingsSync();
+  // initAppData(em);
 
   app.get('/', (req, res) => {
     res.send('Welcome to api.ojami.shop');
@@ -228,11 +231,11 @@ const startServer = async () => {
 
   const PORT = Number(process.env.PORT) || 4000;
 
-  //app.listen(PORT,'0.0.0.0', () => {
-    //console.log(`Server ready on http://localhost:${PORT}`);
-  const server = https.createServer(options, app);
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`App listening on https://localhost:${PORT}`);
+  app.listen(PORT,'0.0.0.0', () => {
+  console.log(`Server ready on http://localhost:${PORT}`);
+  // const server = https.createServer(options, app);
+  // server.listen(PORT, '0.0.0.0', () => {
+    // console.log(`App listening on https://localhost:${PORT}`);
   });
 
 

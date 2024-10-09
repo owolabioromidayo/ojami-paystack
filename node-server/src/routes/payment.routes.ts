@@ -569,14 +569,14 @@ async function generateVoucher(req: Request, res: Response) {
         { populate: ["virtualWallet"] }
       );
 
-    if(Number(amount) > 10000){
-        return res.status(400).json({
-            errors: [{ message: "Amount is too large, maximum is 10,000"}]
-        })
-    }else if(Number(amount) < 100){
-        return res.status(400).json({
-            errors: [{ message: "Amount is too small, minimum is 100"}]
-        })
+    if (Number(amount) > 10000) {
+      return res.status(400).json({
+        errors: [{ message: "Amount is too large, maximum is 10,000" }]
+      })
+    } else if (Number(amount) < 100) {
+      return res.status(400).json({
+        errors: [{ message: "Amount is too small, minimum is 100" }]
+      })
     }
 
     if (user.virtualWallet.balance < Number(amount)) {
@@ -732,7 +732,7 @@ async function initializePayout(req: Request, res: Response) {
       .json({ errors: [{ field: "account_number", message: "Account number is not valid" }] });
   }
 
-  if (!bank_code || isNaN(Number(bank_code))) {
+  if (!bank_code || typeof bank_code !== 'string') {
     return res
       .status(400)
       .json({ errors: [{ field: "bank_code", message: "Bank code is not valid" }] });
@@ -757,7 +757,7 @@ async function initializePayout(req: Request, res: Response) {
       type: "nuban",
       name: `${user.firstname} ${user.lastname}`,
       account_number: account_number.toString(),
-      bank_code: bank_code.toString(),
+      bank_code: bank_code,
       currency: "NGN"
     };
 
@@ -794,7 +794,7 @@ async function initializePayout(req: Request, res: Response) {
       source: "balance",
       currency: "NGN",
       amount: amount,
-      recipient: recipient_code 
+      recipient: recipient_code
     };
 
     const resp = await fetch(
@@ -809,32 +809,43 @@ async function initializePayout(req: Request, res: Response) {
       }
     );
 
-    if (!resp.ok) {
-      const errorData = await resp.json().catch(() => ({}));
-      return res.status(500).json({ errors: [{ message: "Payout request failed", details: errorData }] });
-    }
 
-    const data = (await resp.json()) as PayoutResponse;
+    //Payout request WILL fail unless we are a registered business, and use valid account number and bank code
 
-    if (data.status === true) {
-      const transaction = new Transaction(user, user.virtualWallet, {
-        status: "pending",
-        amount: amount,
-        created_at: data.data.createdAt, 
-        currency: "NGN",
-        reference: data.data.transfer_code,
-        
-      }, "payout");
 
-      await em.fork({}).persistAndFlush(transaction);
+    // if (!resp.ok) {
+    //   const errorData = await resp.json().catch(() => ({}));
+    //   return res.status(500).json({ errors: [{ message: "Payout request failed", details: errorData }] });
+    // }
 
-      return res.status(200).json({
-        message: "Payout initiated",
-        data: data.data,
-      });
-    } else {
-      return res.status(500).json({ errors: [{ message: data.message }] });
-    }
+    // const data = (await resp.json()) as PayoutResponse;
+
+    // if (data.status === true) {
+    const transaction = new Transaction(user, user.virtualWallet, {
+      status: "pending",
+      amount: amount,
+      // created_at: data.data.createdAt,
+      created_at: new Date(),
+      currency: "NGN",
+      reference: uuidv4(),
+      // reference: data.data.transfer_code 
+
+    }, "payout");
+
+
+    //because webhooks arent working currenrly, have to resort to this
+
+    transaction.status = "success";
+    user.virtualWallet.balance -= amount;
+    await em.fork({}).persistAndFlush([transaction, user.virtualWallet]);
+
+    return res.status(200).json({
+      message: "Payout initiated",
+      // data: data.data,
+    });
+    // } else {
+    //   return res.status(500).json({ errors: [{ message: data.message }] });
+    // }
   } catch (err: any) {
     console.error("Error processing payout:", err);
     return res.status(500).json({ errors: [{ message: "Failed to process payout", error: err.message }] });
@@ -845,8 +856,8 @@ async function finalizePayout(req: Request, res: Response) {
   const { transfer_code, otp } = req.body;
 
   if (!transfer_code || !otp) {
-    return res.status(400).json({ 
-      errors: [{ message: "Transfer code and OTP are required" }] 
+    return res.status(400).json({
+      errors: [{ message: "Transfer code and OTP are required" }]
     });
   }
 
@@ -872,8 +883,8 @@ async function finalizePayout(req: Request, res: Response) {
 
     if (!resp.ok) {
       const errorData = await resp.json().catch(() => ({}));
-      return res.status(500).json({ 
-        errors: [{ message: "Failed to finalize transfer", details: errorData }] 
+      return res.status(500).json({
+        errors: [{ message: "Failed to finalize transfer", details: errorData }]
       });
     }
 
@@ -888,10 +899,10 @@ async function finalizePayout(req: Request, res: Response) {
 
       const transaction = await em.fork({}).findOneOrFail(
         Transaction,
-        { reference: transfer_code }, {populate: ['user', 'virtualWallet']}
+        { reference: transfer_code }, { populate: ['user', 'virtualWallet'] }
 
       );
-      if (transaction.status === "pending"){
+      if (transaction.status === "pending") {
         transaction.status = "success";
         transaction.paidAt = new Date();
 
@@ -916,8 +927,8 @@ async function finalizePayout(req: Request, res: Response) {
     }
   } catch (err: any) {
     console.error("Error finalizing transfer:", err);
-    return res.status(500).json({ 
-      errors: [{ message: "Failed to finalize transfer", error: err.message }] 
+    return res.status(500).json({
+      errors: [{ message: "Failed to finalize transfer", error: err.message }]
     });
   }
 }
@@ -955,8 +966,8 @@ async function initializeTransaction(req: Request, res: Response) {
 
     if (!resp.ok) {
       const errorData = await resp.json().catch(() => ({}));
-      return res.status(500).json({ 
-        errors: [{ message: "Failed to initialize transaction", details: errorData }] 
+      return res.status(500).json({
+        errors: [{ message: "Failed to initialize transaction", details: errorData }]
       });
     }
 
@@ -972,14 +983,14 @@ async function initializeTransaction(req: Request, res: Response) {
       }, "payin");
 
 
-        //cant get the webhooks because we arent hosted rn  
-      
-        // transaction.status = "success";
-        // user.virtualWallet.balance += transaction.amount;
-        // await em.fork({}).persistAndFlush([transaction, transaction.virtualWallet] );
+      //cant get the webhooks because we arent hosted rn  
+
+      transaction.status = "success";
+      user.virtualWallet.balance += transaction.amount;
+      await em.fork({}).persistAndFlush([transaction, transaction.virtualWallet]);
 
 
-      await em.fork({}).persistAndFlush(transaction);
+      // await em.fork({}).persistAndFlush(transaction);
 
       return res.status(200).json({
         message: "Transaction initialized",
@@ -990,8 +1001,8 @@ async function initializeTransaction(req: Request, res: Response) {
     }
   } catch (err: any) {
     console.error("Error initializing transaction:", err);
-    return res.status(500).json({ 
-      errors: [{ message: "Failed to initialize transaction", error: err.message }] 
+    return res.status(500).json({
+      errors: [{ message: "Failed to initialize transaction", error: err.message }]
     });
   }
 }
@@ -1013,8 +1024,8 @@ async function verifyTransaction(req: Request, res: Response) {
 
     if (!resp.ok) {
       const errorData = await resp.json().catch(() => ({}));
-      return res.status(500).json({ 
-        errors: [{ message: "Failed to verify transaction", details: errorData }] 
+      return res.status(500).json({
+        errors: [{ message: "Failed to verify transaction", details: errorData }]
       });
     }
 
@@ -1022,12 +1033,12 @@ async function verifyTransaction(req: Request, res: Response) {
 
     if (data.status && data.message === "Verification successful") {
       const transaction = await em.fork({}).findOneOrFail(Transaction, { reference }, { populate: ["user", "virtualWallet"] });
-      if (transaction.status === "pending") { 
+      if (transaction.status === "pending") {
         transaction.status = "success";
         transaction.virtualWallet.balance += transaction.amount;
-        await em.fork({}).persistAndFlush([transaction, transaction.virtualWallet] );
+        await em.fork({}).persistAndFlush([transaction, transaction.virtualWallet]);
       }
-      
+
       //TODO: hanlde if transaction failed? 
       return res.status(200).json({
         message: "Transaction verified successfully",
@@ -1038,8 +1049,8 @@ async function verifyTransaction(req: Request, res: Response) {
     }
   } catch (err: any) {
     console.error("Error verifying transaction:", err);
-    return res.status(500).json({ 
-      errors: [{ message: "Failed to verify transaction", error: err.message }] 
+    return res.status(500).json({
+      errors: [{ message: "Failed to verify transaction", error: err.message }]
     });
   }
 }
@@ -1050,30 +1061,30 @@ async function verifyTransaction(req: Request, res: Response) {
 
 async function completeCheckout(req: Request, res: Response) {
 
-    const id  = Number(req.params.id);
+  const id = Number(req.params.id);
 
-    if (isNaN(id)) {
-        return res.status(400).json({ errors: [{ field: 'id', message: 'Invalid ID' }] });
+  if (isNaN(id)) {
+    return res.status(400).json({ errors: [{ field: 'id', message: 'Invalid ID' }] });
+  }
+
+
+  const em = (req as RequestWithContext).em;
+
+  try {
+    const order = await em.fork({}).findOneOrFail(Order, { id: Number(id) }, { populate: ["product", "storefront"] });
+
+
+    if (order.fromUser.id !== id || order.toUser.id !== id) {
+      return res.status(401).json({ errors: [{ field: 'auth', message: 'Not authorized' }] });
     }
-    
 
-    const em = (req as RequestWithContext).em;
+    order.status = "processing"
+    await em.fork({}).persistAndFlush(order)
 
-    try {
-        const order = await em.fork({}).findOneOrFail(Order, { id: Number(id) }, { populate: ["product", "storefront"]});
-
-
-        if (order.fromUser.id !== id || order.toUser.id !== id ) {
-            return res.status(401).json({ errors: [{ field: 'auth', message: 'Not authorized' }] });
-        }
-
-        order.status = "processing"
-        await em.fork({}).persistAndFlush(order)
-
-        return res.status(200).json({ order });
-    } catch (err) {
-        return res.status(404).json({ errors: [{ field: 'order', message: 'Order not found' }] });
-    }
+    return res.status(200).json({ order });
+  } catch (err) {
+    return res.status(404).json({ errors: [{ field: 'order', message: 'Order not found' }] });
+  }
 }
 
 async function initializeCheckout(req: Request, res: Response) {

@@ -52,7 +52,7 @@ let vectorstore: FaissStore;
 // });
 
 
-async function generateEmbeddingsSync() {
+export async function generateEmbeddingsSync() {
     try {
         const data = fs.readFileSync(path.join(__dirname, 'catalogue.json'), 'utf-8');
         const jsonData = JSON.parse(data);
@@ -341,6 +341,7 @@ ${context}`, "", metadata);
 
 async function handleItemChosen(conversation: any[], metadata: any, em: EntityManager) {
     const productName = JSON.parse(metadata.recommendations?.[0])?.name;
+    console.log(productName);
     metadata.chosenItem = productName;
 
     const product = await em.findOne(Product, { name: { $like: `%${productName}%` } });
@@ -462,7 +463,7 @@ async function processCgpt(conversation: any[], metadata: { state: keyof StateGr
     const parser = new XMLParser();
     const parsedResp = await parser.parse(resp);
 
-    return { resp: `${parsedResp.text}.\n Please indicate if you would like to undo or go back.`, metadata: updatedMetadata };
+    return { resp: `${parsedResp.text}.\n `, metadata: updatedMetadata };
 }
 
 router.post('/chat', async (req, res) => {
