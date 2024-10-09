@@ -32,6 +32,15 @@ import { Product } from './entities/Product';
 import { EntityManager } from '@mikro-orm/core';
 import { Tag } from "./entities/Tag";
 
+
+const https = require("https");
+
+const options = {
+  key: fs.readFileSync(path.join(__dirname, "localhost-key.pem")),
+  cert: fs.readFileSync(path.join(__dirname, "localhost.pem")),
+};
+
+
 console.log(process.env.NODE_ENV);
 
 var cors = require('cors');
@@ -167,7 +176,8 @@ export const createApp = async () => {
   app.set("trust proxy", 1);
   app.use(cors({
     credentials: true,
-    origin: [`http://localhost:${process.env.PORT || 3000}`, 'https://ojami.shop']
+    // origin: [`http://localhost:${process.env.PORT || 3000}`, 'https://ojami.shop']
+    origin: '*'
   }));
 
   app.use(helmet());
@@ -214,11 +224,17 @@ export const createApp = async () => {
 const startServer = async () => {
   const app = await createApp();
 
-  const PORT = process.env.PORT || 4000;
+  const PORT = Number(process.env.PORT) || 4000;
 
-  app.listen(PORT, () => {
-    console.log(`Server ready on http://localhost:${PORT}`);
+  const server = https.createServer(options, app);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`App listening on https://localhost:${PORT}`);
   });
+
+
+  // app.listen(PORT, '0.0.0.0', () => {
+  //   console.log(`Server ready on http://localhost:${PORT}`);
+  // });
 }
 
 startServer().catch((err) => console.error(err));
