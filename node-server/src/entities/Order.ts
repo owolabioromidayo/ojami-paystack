@@ -1,8 +1,9 @@
-import { Entity, PrimaryKey, Property, OneToMany, Collection, ManyToOne, ManyToMany, EntityManager } from "@mikro-orm/core";
+import { Entity, PrimaryKey, Property, OneToMany, Collection, ManyToOne, ManyToMany, EntityManager, OneToOne } from "@mikro-orm/core";
 
-import {Product} from './Product';
-import {Storefront} from './Storefront';
-import {User} from './User';
+import { Product } from './Product';
+import { Storefront } from './Storefront';
+import { User } from './User';
+import { PendingBalance } from "./PendingBalance";
 
 
 @Entity()
@@ -26,6 +27,10 @@ export class Order {
     @ManyToOne(() => User)
     toUser!: User;
 
+    @OneToMany(() => PendingBalance, pendingBalance => pendingBalance.order)
+    pendingBalances = new Collection<PendingBalance>(this);
+
+
     // Order status can be an enum or a simple string
     // Why didn't you just use a simple string. Dyk how long i battled with the postgres driver issue cos TransactionStatus wasn't a defined type!!!
     @Property()
@@ -35,7 +40,7 @@ export class Order {
         storefront: Storefront,
         fromUser: User,
         toUser: User,
-        status: 'pending' | 'processing' |  'completed' | 'canceled') {
+        status: 'pending' | 'processing' | 'completed' | 'canceled') {
         this.product = product;
         this.count = count;
         this.storefront = storefront;

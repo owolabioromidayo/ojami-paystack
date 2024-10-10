@@ -29,7 +29,7 @@ import Script from "next/script";
 
 const Checkout = () => {
   const [orders, setOrders] = useState<Array<Order> | null>(null);
-  const [products, setProducts] = useState<Array<Product> | null>(null);
+  // const [products, setProducts] = useState<Array<Product> | null>(null);
   const { user } = useContext(OjaContext);
   const toast = useToast();
   const [error, setError] = useState(null);
@@ -42,9 +42,14 @@ const Checkout = () => {
       if (!response.ok) {
         throw new Error(`Network response was not ok: ${response.statusText}`);
       }
-      const storeData = await response.json(); // Parse the JSON from the response
-      setOrders(storeData.orders); // Update the products state with fetched data
-      setProducts(storeData.products);
+      const storeData = await response.json();
+      // Filter out completed or failed orders
+      const filteredOrders = storeData.orders.filter(order =>
+        order.status === 'pending'
+      );
+      setOrders(filteredOrders);
+
+      // setProducts(storeData.products);
     } catch (error: any) {
       setError(error.message); // Update error state if there's an error
     } finally {
@@ -58,20 +63,19 @@ const Checkout = () => {
   }, [orders]);
 
   const calculateTotalPrice = (
-    products: Product[] | null,
     orders: Order[] | null
   ) => {
-    if (!products || products.length === 0 || !orders || orders.length === 0)
+    if (!orders || orders.length === 0)
       return 0;
     return orders.reduce((total, order) => {
-      const product = products.find((p) => p.id === order.product);
-      if (!product) return total;
-      return total + product.price * order.count;
+
+      return total + order.product.price * order.count;
     }, 0);
   };
 
   // Calculate the total price
-  const totalPrice = calculateTotalPrice(products, orders);
+  console.log(orders);
+  const totalPrice = calculateTotalPrice(orders);
 
   const { isOpen: isAOpen, onToggle: onAToggle } = useDisclosure();
 
@@ -88,10 +92,10 @@ const Checkout = () => {
             orderId: order.id,
             isInstantPurchase: false,
             amount:
-              products?.find((p) => p.id === order.product)?.price! *
+              order.product.price *
               order.count +
               2500 +
-              products?.find((p) => p.id === order.product)?.price! * 0.05,
+              order.product.price * 0.05,
           }),
         }
       );
@@ -177,10 +181,10 @@ const Checkout = () => {
             currency: "NGN",
             orderId: order.id,
             amount:
-              products?.find((p) => p.id === order.product)?.price! *
+              order.product.price *
               order.count +
               2500 +
-              products?.find((p) => p.id === order.product)?.price! * 0.05,
+              order.product.price * 0.05,
           }),
         }
       );
@@ -494,14 +498,14 @@ const Checkout = () => {
             }}
           >
             {orders &&
-              products?.map((item, index) => (
+              orders.map((item, index) => (
                 <Flex
                   direction="column"
                   gap={3}
                   borderBottom="2px solid #000"
                   py={3}
                   px={1}
-                  key={item.id}
+                  key={item.product.id}
                 >
                   <Flex
                     gap={3}
@@ -523,11 +527,11 @@ const Checkout = () => {
                         <Image
                           border="2px solid #000"
                           rounded="md"
-                          src={item?.images[0]}
+                          src={item.product?.images[0]}
                           w="80px"
                           h="80px"
                           objectFit="cover"
-                          alt={item.name}
+                          alt={item.product?.name}
                         />
                         <Flex
                           pos="absolute"
@@ -544,7 +548,7 @@ const Checkout = () => {
                           fontWeight="600"
                           color="#fff"
                         >
-                          {orders[index].count}
+                          {item.count}
                         </Flex>
                         <Stack>
                           <Flex align="center" gap={2}>
@@ -565,7 +569,7 @@ const Checkout = () => {
                         </Stack>
                       </Flex>
                       <Text fontSize={20} fontWeight={500}>
-                        ₦{item.price?.toLocaleString()}
+                        ₦{item.product.price?.toLocaleString()}
                       </Text>
                     </Flex>
                   </Flex>

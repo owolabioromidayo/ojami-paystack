@@ -46,8 +46,8 @@ export default function App({ Component, pageProps }: AppPropsWithLayout) {
   return (
     <ChakraProvider>
       <Head>
-        <title>ọjà mi | A New Shopping Experience Powered by Kora</title>
-        <meta name="description" content="Powered by Kora Payments" />
+        <title>ọjà mi | A New Shopping Experience </title>
+        <meta name="description" content="" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/icons/oja.svg" />
         <link rel="shortcut icon" href="/icons/oja.svg" />
