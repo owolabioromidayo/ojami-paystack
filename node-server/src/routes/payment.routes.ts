@@ -420,14 +420,15 @@ async function verifyPendingBalance(req: Request, res: Response) {
       const user = await em.fork({}).findOneOrFail(User, { id: userId }, { populate: ["virtualWallet"] });
 
       const pendingBalance = await em.fork({}).findOne(PendingBalance, 
-         { id: Number(id), sendingWallet: user.virtualWallet, status: 'pending' }, {});
+         { id: Number(id), sendingWallet: user.virtualWallet, status: 'pending' }, {populate: ['receivingWallet']});
 
       if (!pendingBalance) {
         return res.status(404).json({ message: 'Pending balance not found or not eligible for verification' });
       }
 
       pendingBalance.status = 'completed';
-      await em.fork({}).persistAndFlush(pendingBalance);
+      pendingBalance.receivingWallet.balance += pendingBalance.amount;
+      await em.fork({}).persistAndFlush([pendingBalance, pendingBalance.receivingWallet]);
 
       res.status(200).json({ message: 'Pending balance verified successfully' });
     } catch (error) {
@@ -460,7 +461,8 @@ async function disputePendingBalance(req: Request, res: Response) {
       }
 
       pendingBalance.status = 'failed';
-      await em.fork({}).persistAndFlush(pendingBalance);
+      user.virtualWallet.balance += pendingBalance.amount; 
+      await em.fork({}).persistAndFlush([ pendingBalance,user.virtualWallet ]);
 
       res.status(200).json({ message: 'Pending balance verified successfully' });
     } catch (error) {
