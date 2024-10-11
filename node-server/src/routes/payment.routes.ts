@@ -78,6 +78,9 @@ router.get("/pending_balances/calculate", isAuth, calculatePendingBalance);
 router.get("/pending_balances", isAuth, getPendingBalances);
 router.post("/pending_balances/update", updatePendingBalances);
 
+router.post("/pending_balances/:id/verify", verifyPendingBalance);
+router.post("/pending_balances/:id/dispute", disputePendingBalance);
+
 router.post("/vouchers/generate", isAuth, generateVoucher);
 router.get("/vouchers/me", isAuth, fetchMyVouchers);
 router.post("/vouchers/redeem", isAuth, redeemVoucher);
@@ -401,6 +404,73 @@ async function updatePendingBalances(req: Request, res: Response) {
       .json({ errors: [{ message: `Could not update pending balances.` }] });
   }
 }
+
+async function verifyPendingBalance(req: Request, res: Response) {
+  const em = (req as RequestWithContext).em;
+
+  try {
+      const { id } = req.params;
+
+      if (!id || isNaN(Number(id))) { 
+        return res.status(400).json({ message: 'Invalid pending balance ID' });
+      }
+
+      const userId = req.session.userid;
+
+      const user = await em.fork({}).findOneOrFail(User, { id: userId }, { populate: ["virtualWallet"] });
+
+      const pendingBalance = await em.fork({}).findOne(PendingBalance, 
+         { id: Number(id), sendingWallet: user.virtualWallet, status: 'pending' }, {});
+
+      if (!pendingBalance) {
+        return res.status(404).json({ message: 'Pending balance not found or not eligible for verification' });
+      }
+
+      pendingBalance.status = 'completed';
+      await em.fork({}).persistAndFlush(pendingBalance);
+
+      res.status(200).json({ message: 'Pending balance verified successfully' });
+    } catch (error) {
+      console.error('Error verifying pending balance:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+
+async function disputePendingBalance(req: Request, res: Response) {
+
+  const em = (req as RequestWithContext).em;
+
+  try {
+      const { id } = req.params;
+
+      if (!id || isNaN(Number(id))) { 
+        return res.status(400).json({ message: 'Invalid pending balance ID' });
+      }
+
+      const userId = req.session.userid;
+
+      const user = await em.fork({}).findOneOrFail(User, { id: userId }, { populate: ["virtualWallet"] });
+
+      const pendingBalance = await em.fork({}).findOne(PendingBalance, 
+         { id: Number(id), sendingWallet: user.virtualWallet, status: 'pending' }, {});
+
+      if (!pendingBalance) {
+        return res.status(404).json({ message: 'Pending balance not found or not eligible for verification' });
+      }
+
+      pendingBalance.status = 'failed';
+      await em.fork({}).persistAndFlush(pendingBalance);
+
+      res.status(200).json({ message: 'Pending balance verified successfully' });
+    } catch (error) {
+      console.error('Error verifying pending balance:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+
+} 
+
+
 
 async function getPendingBalances(req: Request, res: Response) {
   const em = (req as RequestWithContext).em;

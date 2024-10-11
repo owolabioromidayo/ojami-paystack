@@ -96,6 +96,53 @@ const VirtualTransactionHistory: React.FC = () => {
     onOpen();
   };
 
+  const handleVerifyPendingBalance = async (id: number) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_OJAMI}/api/payments/pending_balances/${id}/verify`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to verify pending balance');
+      }
+      // Update the pending balance status in place
+      setPendingBalances(prevBalances =>
+        prevBalances.map(balance =>
+          balance.id === id ? { ...balance, status: 'completed' } : balance
+        )
+      );
+    } catch (error) {
+      console.error('Error verifying pending balance:', error);
+    }
+  }
+
+  const handleDisputePendingBalance = async (id: number) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_OJAMI}/api/payments/pending_balances/${id}/dispute`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to dispute pending balance');
+      }
+      // Update the pending balance status in place
+      setPendingBalances(prevBalances =>
+        prevBalances.map(balance =>
+          balance.id === id ? { ...balance, status: 'failed' } : balance
+        )
+      );
+    } catch (error) {
+      console.error('Error disputing pending balance:', error);
+    }
+  }
+
+
   return (
     <Box p={4}>
       <Heading mb={4}>Virtual Transaction History</Heading>
@@ -137,6 +184,7 @@ const VirtualTransactionHistory: React.FC = () => {
             <Th>Status</Th>
             <Th>User Action</Th>
             <Th>Order Details</Th>
+            <Th>Actions</Th>
           </Tr>
         </Thead>
         <Tbody>
@@ -155,6 +203,14 @@ const VirtualTransactionHistory: React.FC = () => {
               <Td>
                 <Button size="sm" onClick={() => handleOrderClick(balance.order)}>
                   View Order
+                </Button>
+              </Td>
+              <Td>
+                <Button size="sm" colorScheme="green" mr={2} onClick={() => handleVerifyPendingBalance(balance.id)}>
+                  Verify
+                </Button>
+                <Button size="sm" colorScheme="red" onClick={() => handleDisputePendingBalance(balance.id)}>
+                  Dispute
                 </Button>
               </Td>
             </Tr>
