@@ -35,10 +35,10 @@ import { Tag } from "./entities/Tag";
 
 // const https = require("https");
 
-// const options = {
-//   key: fs.readFileSync(path.join(__dirname, "localhost-key.pem")),
-//   cert: fs.readFileSync(path.join(__dirname, "localhost.pem")),
-// };
+ //const options = {
+ //  key: fs.readFileSync(path.join(__dirname, "localhost-key.pem")),
+ //  cert: fs.readFileSync(path.join(__dirname, "localhost.pem")),
+ //};
 
 
 console.log(process.env.NODE_ENV);
@@ -176,7 +176,7 @@ export const createApp = async () => {
   app.set("trust proxy", 1);
   app.use(cors({
     credentials: true,
-    origin: [`http://localhost:${process.env.PORT || 3000}`, 'https://ojami-paystack-bwjp.vercel.app']
+    origin: [`http://localhost:${process.env.PORT || 3000}`, process.env.FE_DOMAIN_URL ]
     //origin: (origin: any, callback: any ) => {callback(null, true); }
     //origin: '*'
   }));
@@ -205,7 +205,7 @@ export const createApp = async () => {
 
 
   await generateEmbeddingsSync();
-  // initAppData(em);
+  initAppData(em);
 
   app.get('/', (req, res) => {
     res.send('Welcome to api.ojami.shop');
@@ -239,9 +239,6 @@ const startServer = async () => {
   });
 
 
-  // app.listen(PORT, '0.0.0.0', () => {
-  //   console.log(`Server ready on http://localhost:${PORT}`);
-  // });
 }
 
 startServer().catch((err) => console.error(err));
