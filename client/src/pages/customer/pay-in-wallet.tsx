@@ -73,19 +73,6 @@ const PayInWallet: React.FC = () => {
                             placeholder="Enter amount"
                         />
                     </FormControl>
-                    {/* <FormControl isRequired>
-                        <FormLabel>Payment Method</FormLabel>
-                        <Select
-                            placeholder="Select payment method"
-                            value={paymentMethod}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
-                        >
-                            <option value="bank_transfer">Bank Transfer</option>
-                            <option value="credit_card">Credit Card</option>
-                            <option value="paypal">PayPal</option>
-                            
-                </Select>
-            </FormControl> */}
                     <Button type="submit" colorScheme="blue">
                         Pay In
                     </Button>

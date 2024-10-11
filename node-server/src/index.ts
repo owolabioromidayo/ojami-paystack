@@ -205,7 +205,7 @@ export const createApp = async () => {
 
 
   await generateEmbeddingsSync();
-  initAppData(em);
+//  initAppData(em);
 
   app.get('/', (req, res) => {
     res.send('Welcome to api.ojami.shop');

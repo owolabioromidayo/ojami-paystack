@@ -88,9 +88,14 @@ router.post("/transaction/initialize", isAuth, initializeTransaction);
 router.get("/transaction/verify/:reference", verifyTransaction);
 
 
+router.get("/transactions", isAuth, getVirtualWalletTransactions);
+router.get("/transactions/virtual", isAuth, getVirtualTransactions);
+
+
 //payout to bank account
 router.post("/payout/initialize", isAuth, initializePayout);
 router.post("/payout/finalize", isAuth, finalizePayout);
+
 
 async function createNewVirtualBankAccount(req: Request, res: Response) {
   const em = (req as RequestWithContext).em;
@@ -292,22 +297,27 @@ async function makeVirtualPayment(req: Request, res: Response) {
       return res.status(200).json({ virtualTransaction });
     }
     // delayed purchases
-    // create a new pending balance (default time is 7 days)
+    // create a new pending balance (default time is 14  days)
+    const order = await em
+      .fork({})
+      .findOneOrFail(Order, { id: orderId, fromUser: req.session.userid });
     sendingUser_wallet.balance -= amount;
     const pendingBalance = new PendingBalance(
       sendingUser_wallet,
       receivingUser_wallet,
-      amount
+      amount,
+      order
     );
     pendingBalance.currency = "NGN";
     virtualTransaction.status = VirtualTransactionStatus.PENDING;
 
+    sendingUser_wallet.pendingBalances.add(pendingBalance);
+    receivingUser_wallet.pendingBalances.add(pendingBalance);
+
     // set order to processing
-    const order = await em
-      .fork({})
-      .findOne(Order, { id: orderId, fromUser: req.session.userid });
     if (order) {
       order.status = "processing";
+      order.pendingBalances.add(pendingBalance);
       await em.fork({}).persistAndFlush(order);
     }
 
@@ -398,13 +408,35 @@ async function getPendingBalances(req: Request, res: Response) {
   try {
     const user = await em
       .fork({})
-      .findOneOrFail(
-        User,
-        { id: req.session.userid },
-        { populate: ["virtualWallet.pendingBalances"] }
-      );
-    const pendingBalances = user.virtualWallet.pendingBalances.getItems();
-    return res.status(200).json({ pendingBalances: pendingBalances });
+      .findOneOrFail(User, { id: req.session.userid }, { populate: ["virtualWallet"] });
+
+    const pendingBalances = await em.fork({}).find(PendingBalance, {
+      $or: [
+        { sendingWallet: user.virtualWallet },
+        { receivingWallet: user.virtualWallet }
+      ]
+    }, { populate: ["sendingWallet", "receivingWallet", "order.product"] });
+
+    const formattedPendingBalances = pendingBalances.map(balance => ({
+      id: balance.id,
+      createdAt: balance.createdAt,
+      resolvesAt: balance.resolvesAt,
+      amount: balance.amount,
+      status: balance.status,
+      currency: balance.currency,
+      role: balance.sendingWallet.id === user.virtualWallet.id ? 'sender' : 'receiver',
+      order: {
+        id: balance.order.id,
+        product: {
+          name: balance.order.product.name,
+          price: balance.order.product.price
+        },
+        count: balance.order.count,
+        status: balance.order.status
+      }
+    }));
+
+    return res.status(200).json({ pendingBalances: formattedPendingBalances });
   } catch (err) {
     return res
       .status(500)
@@ -1152,5 +1184,99 @@ async function initializeCheckout(req: Request, res: Response) {
       });
   }
 }
+
+
+async function getVirtualWalletTransactions(req: Request, res: Response) {
+  const em = (req as RequestWithContext).em;
+  try {
+    const user = await em.findOneOrFail(User, { id: req.session.userid }, { populate: ['virtualWallet.transactions'] });
+
+    return res.status(200).json({
+      message: "Virtual wallet transactions fetched successfully",
+      data: { id: user.virtualWallet.id, transactions: user.virtualWallet.transactions.getItems() }
+    });
+  } catch (err: any) {
+    console.error("Error fetching virtual wallet transactions:", err);
+    return res.status(500).json({
+      errors: [{ message: "Failed to fetch virtual wallet transactions", error: err.message }]
+    });
+  }
+};
+
+async function getVirtualTransactions(req: Request, res: Response) {
+  const em = (req as RequestWithContext).em;
+  try {
+    const user = await em.findOneOrFail(User, { id: req.session.userid }, { populate: ['virtualWallet.virtualTransactions'] });
+
+    return res.status(200).json({
+      message: "Virtual transactions fetched successfully",
+      data: { id: user.virtualWallet.id, transactions: user.virtualWallet.virtualTransactions.getItems() }
+    });
+  } catch (err: any) {
+    console.error("Error fetching virtual transactions:", err);
+    return res.status(500).json({
+      errors: [{ message: "Failed to fetch virtual transactions", error: err.message }]
+    });
+  }
+};
+
+
+
+async function resolvePendingBalance(req: Request, res: Response) {
+  const em = (req as RequestWithContext).em;
+  const { pendingBalanceId } = req.body;
+
+  if (!pendingBalanceId || isNaN(Number(pendingBalanceId))) {
+    return res.status(400).json({
+      errors: [{ field: "pendingBalanceId", message: "Invalid pending balance ID" }]
+    });
+  }
+
+  try {
+    const pendingBalance = await em.findOneOrFail(PendingBalance, { id: Number(pendingBalanceId) }, { populate: ['sendingWallet', 'receivingWallet', 'order'] });
+
+    if (pendingBalance.status !== 'pending') {
+      return res.status(400).json({
+        errors: [{ message: "This pending balance has already been resolved" }]
+      });
+    }
+
+    if (pendingBalance.order.fromUser.id !== req.session.userid) {
+      return res.status(403).json({
+        errors: [{ message: "You are not authorized to resolve this pending balance" }]
+      });
+    }
+
+    pendingBalance.receivingWallet.balance += pendingBalance.amount;
+
+    pendingBalance.status = 'completed';
+    pendingBalance.order.status = 'completed';
+
+    await em.persistAndFlush([pendingBalance, pendingBalance.sendingWallet, pendingBalance.receivingWallet, pendingBalance.order]);
+
+    return res.status(200).json({
+      message: "Pending balance resolved successfully",
+      data: {
+        pendingBalance,
+        order: pendingBalance.order
+      }
+    });
+
+  } catch (err: any) {
+    console.error("Error resolving pending balance:", err);
+    return res.status(500).json({
+      errors: [{ message: "Failed to resolve pending balance", error: err.message }]
+    });
+  }
+}
+
+// Add the new route
+router.post('/resolve-pending-balance', isAuth, resolvePendingBalance);
+
+
+
+
+
+
 
 export default router;

@@ -431,19 +431,12 @@ async function getUserOrders(req: Request, res: Response) {
     const em = (req as RequestWithContext).em;
 
     try {
-        // Fetch orders for the user
-        const orders = await em.fork({}).find(Order, { toUser: Number(req.session.userid), status: { $eq: 'pending' } });
+        const orders = await em.fork({}).find(Order, { fromUser: Number(req.session.userid), status: { $eq: 'pending' }}, {populate: ['product', 'storefront']});
+        // const products = await Promise.all(orders.map(order => 
+        //     em.fork({}).findOneOrFail(Product, { id: order.product.id }, { populate: ['storefront'] })
+        // ));
 
-        // Initialize an array to hold products
-        const products = [];
-
-        // Loop through each order to fetch the corresponding product
-        for (const order of orders) {
-            const product = await em.fork({}).findOneOrFail(Product, { id: order.product.id }, { populate: ['storefront'] });
-            products.push(product); // Add the fetched product to the products array
-        }
-
-        return res.status(200).json({ orders, products }); // Return both orders and products
+        return res.status(200).json({ orders});
     } catch (err) {
         return res.status(500).json({ errors: [{ field: 'orders', message: 'Could not fetch orders for this user', error: err }] });
     }
@@ -453,19 +446,12 @@ async function getUserOrderHistory(req: Request, res: Response) {
     const em = (req as RequestWithContext).em;
 
     try {
-        // Fetch orders for the user
         const orders = await em.fork({}).find(Order, { fromUser: Number(req.session.userid) });
+        const products = await Promise.all(orders.map(order => 
+            em.fork({}).findOneOrFail(Product, { id: order.product.id }, { populate: ['storefront'] })
+        ));
 
-        // Initialize an array to hold products
-        const products = [];
-
-        // Loop through each order to fetch the corresponding product
-        for (const order of orders) {
-            const product = await em.fork({}).findOneOrFail(Product, { id: order.product.id }, { populate: ['storefront'] });
-            products.push(product); // Add the fetched product to the products array
-        }
-
-        return res.status(200).json({ orders, products }); // Return both orders and products
+        return res.status(200).json({ orders, products });
     } catch (err) {
         return res.status(500).json({ errors: [{ field: 'orders', message: 'Could not fetch orders for this user', error: err }] });
     }

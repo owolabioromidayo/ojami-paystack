@@ -17,7 +17,7 @@
   <h3 align="center">ọjà mi</h3>
 
   <p align="center">
-    A new shopping experience powered by Kora
+    A new shopping experience powered
     <br />
     <a href="https://github.com/owolabioromidayo/ojami"><strong>Explore the docs »</strong></a>
     <br />
